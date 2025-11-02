@@ -136,9 +136,4 @@ Example outputs:
 2. TensorFlow/Keras Docs – CNN implementation examples
 3. Analytics Vidhya / Medium – Emotion Recognition tutorials
 
-## 👤 Authors
-Saksham Kumar
-Shreeya Barahpuriya
-Department of Computer Applications — BCA V Semester
-
-|| “By enabling computers to understand non-verbal cues, this system enhances human-computer interaction and contributes toward more adaptive, intelligent AI systems.” ||
+#### “By enabling computers to understand non-verbal cues, this system enhances human-computer interaction and contributes toward more adaptive, intelligent AI systems.”
