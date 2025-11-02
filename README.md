@@ -95,9 +95,8 @@ Metrics: Accuracy
 ## 📈 Training Results
 Accuracy curves and confusion matrix are saved under /model/
 Example outputs:
-training_plot.png → model accuracy & loss over epochs
-  
-confusion_matrix.png → visual of predicted vs true labels
+- training_plot.png → model accuracy & loss over epochs
+- confusion_matrix.png → visual of predicted vs true labels
 
 ## 💻 Real-Time Detection (main.py)
 - Uses OpenCV to capture webcam video
