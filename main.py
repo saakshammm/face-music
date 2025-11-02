@@ -1,72 +1,160 @@
-# main.py — Real-time Emotion Detection (clean Streamlit version)
+import os 
+import numpy as np # type: ignore
+import matplotlib.pyplot as plt # type: ignore
+from tensorflow.keras.preprocessing.image import ImageDataGenerator # type: ignore
+from tensorflow.keras.models import Sequential # type: ignore
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization # type: ignore
+from tensorflow.keras.optimizers import Adam # type: ignore
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau # type: ignore
+from sklearn.utils.class_weight import compute_class_weight # type: ignore
+from sklearn.metrics import classification_report, confusion_matrix # type: ignore
+ 
+# config
+DATA_DIR = "data"
+TRAIN_DIR = os.path.join(DATA_DIR, "train")
+TEST_DIR = os.path.join(DATA_DIR, "test")
+MODEL_DIR = os.path.join(DATA_DIR, "model")
+os.makedirs(MODEL_DIR, exist_ok=True)
 
-import cv2
-import numpy as np
-import streamlit as st
-from tensorflow.keras.models import load_model  # type: ignore
-from tensorflow.keras.preprocessing.image import img_to_array  # type: ignore
+IMG_SIZE = 48
+BATCH_SIZE = 32
+EPOCHS = 25
+SEED = 42
+LEARNING_RATE = 1e-3
+MODEL_PATH = os.path.join(MODEL_DIR, "emotion_model.h5")
 
-# --------------------------- CONFIG ---------------------------
-MODEL_PATH = r"data\model\emotion_model.h5"
-CASCADE_PATH = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-EMOTIONS = ['angry', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+# data generator
+print("[INFO] Loading data...")
+train_datagen = ImageDataGenerator(
+    rescale=1.0/255.0,
+    rotation_range=25,
+    width_shift_range=0.15,
+    height_shift_range=0.15,
+    shear_range=0.1,
+    zoom_range=0.1,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+val_datagen = ImageDataGenerator(rescale=1.0/255.0)
 
-# --------------------------- LOAD MODEL ---------------------------
-@st.cache_resource
-def load_emotion_model():
-    return load_model(MODEL_PATH)
-
-model = load_emotion_model()
-face_detector = cv2.CascadeClassifier(CASCADE_PATH)
-
-# --------------------------- PAGE SETUP ---------------------------
-st.set_page_config(page_title="Emotion Detection", page_icon="🎭", layout="centered")
-
-st.markdown(
-    """
-    <style>
-    body { background-color: #0e1117; color: white; text-align: center; }
-    h1 { color: #ffcc00; text-align: center; }
-    .note { color: #aaa; font-size: 0.9rem; margin-bottom: 1rem; }
-    </style>
-    """,
-    unsafe_allow_html=True
+train_gen = train_datagen.flow_from_directory(
+    TRAIN_DIR,
+    target_size=(IMG_SIZE, IMG_SIZE),
+    color_mode='grayscale',
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=True,
+    seed=SEED
 )
 
-st.title("🎭 Real-Time Facial Emotion Detection")
-st.markdown("<div class='note'>Powered by CNN</div>", unsafe_allow_html=True)
+val_gen = val_datagen.flow_from_directory(
+    TEST_DIR,
+    target_size=(IMG_SIZE, IMG_SIZE),
+    color_mode='grayscale',
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=False
+)
 
-# --------------------------- WEBCAM STREAM ---------------------------
-run = st.checkbox("Start Webcam")
-FRAME_WINDOW = st.image(np.zeros((240, 320, 3), dtype=np.uint8), caption="Live Feed", use_container_width=True)
+num_classes = train_gen.num_classes
+class_indices = train_gen.class_indices
+inv_class_map = {v: k for k, v in class_indices.items()}
+print(f"[INFO] Detected classes: {class_indices}")
 
-cap = cv2.VideoCapture(0)
+# class weights
+train_labels = train_gen.classes
+class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(train_labels), y=train_labels)
+class_weight_dict = {i: w for i, w in enumerate(class_weights)}
+print("[INFO] Computed class weights:")
+for idx, w in class_weight_dict.items():
+    print(f"  {inv_class_map[idx]}: {w:.3f}")
 
-while run:
-    ret, frame = cap.read()
-    if not ret:
-        st.warning("Could not access webcam.")
-        break
+# model
+print("[INFO] Building CNN model...")
+model = Sequential([
+    Conv2D(32, (3,3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 1)),
+    MaxPooling2D(2,2),
+    Conv2D(64, (3,3), activation='relu'),
+    MaxPooling2D(2,2),
+    Conv2D(128, (3,3), activation='relu'),
+    MaxPooling2D(2,2),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(num_classes, activation='softmax')
+])
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+model.compile(optimizer=Adam(learning_rate=LEARNING_RATE),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
 
-    for (x, y, w, h) in faces:
-        roi_gray = gray[y:y+h, x:x+w]
-        roi_gray = cv2.resize(roi_gray, (48, 48))
-        roi = roi_gray.astype("float") / 255.0
-        roi = img_to_array(roi)
-        roi = np.expand_dims(roi, axis=0)
+model.summary()
 
-        preds = model.predict(roi, verbose=0)[0]
-        label = EMOTIONS[np.argmax(preds)]
-        confidence = np.max(preds) * 100
+# callbacks
+checkpoint = ModelCheckpoint(MODEL_PATH, monitor='val_accuracy', save_best_only=True, verbose=1)
+earlystop = EarlyStopping(monitor='val_loss', patience=6, restore_best_weights=True, verbose=1)
+reducelr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, verbose=1, min_lr=1e-6)
+callbacks = [checkpoint, earlystop, reducelr]
 
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 255), 2)
-        cv2.putText(frame, f"{label} ({confidence:.1f}%)", (x, y-10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+# train
+print("[INFO] Training model...")
+history = model.fit(
+    train_gen,
+    epochs=EPOCHS,
+    validation_data=val_gen,
+    class_weight=class_weight_dict,
+    callbacks=callbacks
+)
 
-    FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_container_width=True)
+print(f"[INFO] Saving best model to {MODEL_PATH}")
+model.save(MODEL_PATH)
 
-cap.release()
+# plots
+print("[INFO] Plotting accuracy and loss curves...")
+acc, val_acc = history.history['accuracy'], history.history['val_accuracy']
+loss, val_loss = history.history['loss'], history.history['val_loss']
+epochs = range(1, len(acc) + 1)
 
+plt.figure(figsize=(12,4))
+plt.subplot(1,2,1)
+plt.plot(epochs, acc, label='Train Acc')
+plt.plot(epochs, val_acc, label='Val Acc')
+plt.title('Model Accuracy')
+plt.legend()
+
+plt.subplot(1,2,2)
+plt.plot(epochs, loss, label='Train Loss')
+plt.plot(epochs, val_loss, label='Val Loss')
+plt.title('Model Loss')
+plt.legend()
+plt.tight_layout()
+plt.savefig(os.path.join(MODEL_DIR, 'training_plot.png'))
+plt.show()
+
+# evaluation
+print("[INFO] Evaluating model...")
+val_gen.reset()
+preds = model.predict(val_gen, verbose=1)
+y_pred = np.argmax(preds, axis=1)
+y_true = val_gen.classes
+
+print("Classification Report:")
+print(classification_report(y_true, y_pred, target_names=[inv_class_map[i] for i in range(num_classes)]))
+
+cm = confusion_matrix(y_true, y_pred)
+print("Confusion Matrix:\n", cm)
+
+plt.figure(figsize=(8,6))
+plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+plt.title('Confusion Matrix')
+plt.colorbar()
+classes = [inv_class_map[i] for i in range(num_classes)]
+plt.xticks(np.arange(len(classes)), classes, rotation=45)
+plt.yticks(np.arange(len(classes)), classes)
+plt.xlabel('Predicted')
+plt.ylabel('True')
+plt.tight_layout()
+plt.savefig(os.path.join(MODEL_DIR, 'confusion_matrix.png'))
+plt.show()
+
+print("[DONE] Training completed successfully.")
