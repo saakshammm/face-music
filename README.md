@@ -33,8 +33,8 @@ The system detects faces from a live webcam feed, preprocesses them into 48×48 
 ```
 Emotion-Detection/
 ├── data
-│ ├── train
-│ ├── test
+│ ├── train/
+│ ├── test/
 │
 ├── model/ 
 │ ├── emotion_model.h5
@@ -43,7 +43,7 @@ Emotion-Detection/
 ├── training_plot.png
 │
 ├── scripts/
-│ ├── train_model.py 
+│ ├── model_training.py 
 │
 ├── main.py 
 ├── requirements.txt 
