@@ -1,19 +1,15 @@
-# scripts/train_model.py
-# Custom CNN model for Emotion Detection (FER-2013)
-# Matches synopsis: no transfer learning, trained from scratch.
-
-import os
-import numpy as np
-import matplotlib.pyplot as plt
+import os 
+import numpy as np # type: ignore
+import matplotlib.pyplot as plt # type: ignore
 from tensorflow.keras.preprocessing.image import ImageDataGenerator # type: ignore
 from tensorflow.keras.models import Sequential # type: ignore
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, BatchNormalization # type: ignore
 from tensorflow.keras.optimizers import Adam # type: ignore
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau # type: ignore
-from sklearn.utils.class_weight import compute_class_weight
-from sklearn.metrics import classification_report, confusion_matrix
-
-# --------------------------- CONFIG ---------------------------
+from sklearn.utils.class_weight import compute_class_weight # type: ignore
+from sklearn.metrics import classification_report, confusion_matrix # type: ignore
+ 
+# config
 DATA_DIR = "data"
 TRAIN_DIR = os.path.join(DATA_DIR, "train")
 TEST_DIR = os.path.join(DATA_DIR, "test")
@@ -27,7 +23,7 @@ SEED = 42
 LEARNING_RATE = 1e-3
 MODEL_PATH = os.path.join(MODEL_DIR, "emotion_model.h5")
 
-# --------------------------- DATA GENERATORS ---------------------------
+# data generator
 print("[INFO] Loading data...")
 train_datagen = ImageDataGenerator(
     rescale=1.0/255.0,
@@ -65,7 +61,7 @@ class_indices = train_gen.class_indices
 inv_class_map = {v: k for k, v in class_indices.items()}
 print(f"[INFO] Detected classes: {class_indices}")
 
-# --------------------------- CLASS WEIGHTS ---------------------------
+# class weights
 train_labels = train_gen.classes
 class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(train_labels), y=train_labels)
 class_weight_dict = {i: w for i, w in enumerate(class_weights)}
@@ -73,7 +69,7 @@ print("[INFO] Computed class weights:")
 for idx, w in class_weight_dict.items():
     print(f"  {inv_class_map[idx]}: {w:.3f}")
 
-# --------------------------- MODEL ---------------------------
+# model
 print("[INFO] Building CNN model...")
 model = Sequential([
     Conv2D(32, (3,3), activation='relu', input_shape=(IMG_SIZE, IMG_SIZE, 1)),
@@ -94,13 +90,13 @@ model.compile(optimizer=Adam(learning_rate=LEARNING_RATE),
 
 model.summary()
 
-# --------------------------- CALLBACKS ---------------------------
+# callbacks
 checkpoint = ModelCheckpoint(MODEL_PATH, monitor='val_accuracy', save_best_only=True, verbose=1)
 earlystop = EarlyStopping(monitor='val_loss', patience=6, restore_best_weights=True, verbose=1)
 reducelr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, verbose=1, min_lr=1e-6)
 callbacks = [checkpoint, earlystop, reducelr]
 
-# --------------------------- TRAIN ---------------------------
+# train
 print("[INFO] Training model...")
 history = model.fit(
     train_gen,
@@ -113,7 +109,7 @@ history = model.fit(
 print(f"[INFO] Saving best model to {MODEL_PATH}")
 model.save(MODEL_PATH)
 
-# --------------------------- PLOTS ---------------------------
+# plots
 print("[INFO] Plotting accuracy and loss curves...")
 acc, val_acc = history.history['accuracy'], history.history['val_accuracy']
 loss, val_loss = history.history['loss'], history.history['val_loss']
@@ -135,7 +131,7 @@ plt.tight_layout()
 plt.savefig(os.path.join(MODEL_DIR, 'training_plot.png'))
 plt.show()
 
-# --------------------------- EVALUATION ---------------------------
+# evaluation
 print("[INFO] Evaluating model...")
 val_gen.reset()
 preds = model.predict(val_gen, verbose=1)
