@@ -116,24 +116,5 @@ Example outputs:
 | Frontend / Deployment | Streamlit           |
 | Evaluation            | scikit-learn        |
 
-## 🧱 System Requirements
-| Component | Minimum                        | Recommended           |
-| --------- | ------------------------------ | --------------------- |
-| CPU       | Intel i5 / AMD equivalent      | i7+                   |
-| GPU       | —                              | NVIDIA (CUDA 2–4 GB+) |
-| RAM       | 8 GB                           | 16 GB                 |
-| OS        | Windows 10/11, Linux, or macOS | —                     |
-| Python    | 3.7+                           | 3.10+                 |
-
-## 🚀 Future Enhancements
-- Integrate with transfer learning (e.g., MobileNetV2) for higher accuracy
-- Add multi-face detection and batch prediction
-- Build dashboard view to analyze emotions over time
-- Explore multimodal emotion recognition (audio + facial)
-
-## 📚 References
-1. OpenCV – Face detection using Haarcascade
-2. TensorFlow/Keras Docs – CNN implementation examples
-3. Analytics Vidhya / Medium – Emotion Recognition tutorials
 
 #### “By enabling computers to understand non-verbal cues, this system enhances human-computer interaction and contributes toward more adaptive, intelligent AI systems.”
